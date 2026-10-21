@@ -1,6 +1,26 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
-export const Header: React.FC = () => {
+interface Props {
+  activeTab: 'QA' | 'DOCS';
+  onTabChange: (tab: 'QA' | 'DOCS') => void;
+}
+
+export const Header: React.FC<Props> = ({ activeTab, onTabChange }) => {
+  const [llmProvider, setLlmProvider] = useState<string | null>(null);
+  const [llmModel, setLlmModel] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('http://localhost:8000/health')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setLlmProvider(data.llm_provider || null);
+          setLlmModel(data.llm_model || null);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <header className="header">
       <div className="header-inner">
@@ -18,11 +38,68 @@ export const Header: React.FC = () => {
             <path d="m9 12 2 2 4-4" />
           </svg>
           <span className="brand-title">TruthGuard</span>
-          <span className="brand-tag">v0.1.0 Foundation</span>
+          <span className="brand-tag">v0.2.0 Verification</span>
         </div>
+
+        {/* Tab Navigation */}
+        <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.25rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <button
+            type="button"
+            onClick={() => onTabChange('QA')}
+            style={{
+              padding: '0.4rem 0.85rem',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              background: activeTab === 'QA' ? 'var(--accent-blue)' : 'transparent',
+              color: activeTab === 'QA' ? '#fff' : 'var(--text-muted)'
+            }}
+          >
+            🔎 Question Answering & Verification
+          </button>
+          <button
+            type="button"
+            onClick={() => onTabChange('DOCS')}
+            style={{
+              padding: '0.4rem 0.85rem',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              background: activeTab === 'DOCS' ? 'var(--accent-blue)' : 'transparent',
+              color: activeTab === 'DOCS' ? '#fff' : 'var(--text-muted)'
+            }}
+          >
+            📚 Ingestion & Document Library
+          </button>
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Stack: Spring Boot · React · FastAPI · pgvector
+          {llmProvider && (
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '0.25rem 0.65rem',
+                borderRadius: '6px',
+                border: `1px solid ${llmProvider === 'mock' ? '#f59e0b' : '#10b981'}`,
+                background: llmProvider === 'mock' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                color: llmProvider === 'mock' ? '#fbbf24' : '#34d399',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              title={`Active Model: ${llmModel || 'unknown'}`}
+            >
+              <span style={{ fontSize: '0.85rem' }}>{llmProvider === 'mock' ? '🧪' : '🤖'}</span>
+              LLM: <strong>{llmProvider.toUpperCase()}</strong>
+            </span>
+          )}
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Ports: <strong>8080</strong> (Java) · <strong>8000</strong> (Python)
           </span>
         </div>
       </div>

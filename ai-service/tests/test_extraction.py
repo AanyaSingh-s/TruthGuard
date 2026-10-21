@@ -103,3 +103,64 @@ def test_reject_blank_whitespace_document():
     files = {"file": ("blank.txt", b"   \n\t  \n  ", "text/plain")}
     response = client.post("/api/v1/extract-text", files=files)
     assert response.status_code == 422
+
+
+def test_extract_synthetic_sample_files():
+    """Verify end-to-end extraction against all generated synthetic corpora sample files."""
+    import os
+
+    sample_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sample_documents"))
+    if not os.path.exists(sample_dir):
+        pytest.skip(f"Synthetic sample documents directory not found at {sample_dir}")
+
+    # 1. Test sample_policy_v1.txt
+    with open(os.path.join(sample_dir, "sample_policy_v1.txt"), "rb") as f:
+        res = client.post("/api/v1/extract-text", files={"file": ("sample_policy_v1.txt", f.read(), "text/plain")})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["format"] == "TXT"
+        assert "multi-factor authentication" in data["extracted_text"]
+
+    # 2. Test sample_policy_v2.txt
+    with open(os.path.join(sample_dir, "sample_policy_v2.txt"), "rb") as f:
+        res = client.post("/api/v1/extract-text", files={"file": ("sample_policy_v2.txt", f.read(), "text/plain")})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["format"] == "TXT"
+        assert "FIDO2" in data["extracted_text"]
+
+    # 3. Test sample_regulation.pdf
+    with open(os.path.join(sample_dir, "sample_regulation.pdf"), "rb") as f:
+        res = client.post("/api/v1/extract-text", files={"file": ("sample_regulation.pdf", f.read(), "application/pdf")})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["format"] == "PDF"
+        assert "Regulatory Compliance Guideline" in data["extracted_text"]
+
+    # 4. Test sample_specification.docx
+    with open(os.path.join(sample_dir, "sample_specification.docx"), "rb") as f:
+        res = client.post("/api/v1/extract-text", files={"file": ("sample_specification.docx", f.read(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["format"] == "DOCX"
+        assert "System Specification" in data["extracted_text"]
+
+    # 5. Test empty_document.txt -> 400
+    with open(os.path.join(sample_dir, "empty_document.txt"), "rb") as f:
+        res = client.post("/api/v1/extract-text", files={"file": ("empty_document.txt", f.read(), "text/plain")})
+        assert res.status_code == 400
+
+    # 6. Test whitespace_only.txt -> 422
+    with open(os.path.join(sample_dir, "whitespace_only.txt"), "rb") as f:
+        res = client.post("/api/v1/extract-text", files={"file": ("whitespace_only.txt", f.read(), "text/plain")})
+        assert res.status_code == 422
+
+    # 7. Test corrupt_malformed.pdf -> 422
+    with open(os.path.join(sample_dir, "corrupt_malformed.pdf"), "rb") as f:
+        res = client.post("/api/v1/extract-text", files={"file": ("corrupt_malformed.pdf", f.read(), "application/pdf")})
+        assert res.status_code == 422
+
+    # 8. Test unsupported_format.exe -> 415
+    with open(os.path.join(sample_dir, "unsupported_format.exe"), "rb") as f:
+        res = client.post("/api/v1/extract-text", files={"file": ("unsupported_format.exe", f.read(), "application/octet-stream")})
+        assert res.status_code == 415

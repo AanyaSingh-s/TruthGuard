@@ -66,13 +66,13 @@ async def extract_document_text(file: UploadFile = File(...)) -> TextExtractionR
     except EmptyDocumentError as e:
         logger.warning("Empty document content in %s: %s", file.filename, e)
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"error": "EmptyDocumentError", "message": str(e)}
         )
     except MalformedDocumentError as e:
         logger.error("Malformed document parsing %s: %s", file.filename, e)
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"error": "MalformedDocumentError", "message": str(e)}
         )
     except Exception as e:

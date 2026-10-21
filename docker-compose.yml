@@ -18,6 +18,106 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - truthguard-network
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: truthguard-ai-service
+    restart: unless-stopped
+    environment:
+      AI_SERVICE_ENV: ${AI_SERVICE_ENV:-development}
+      AI_SERVICE_HOST: 0.0.0.0
+      AI_SERVICE_PORT: 8000
+      DB_HOST: truthguard-postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-truthguard}
+      DB_USER: ${POSTGRES_USER:-truthguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-truthguard_dev_password}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-truthguard}:${POSTGRES_PASSWORD:-truthguard_dev_password}@truthguard-postgres:5432/${POSTGRES_DB:-truthguard}
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+      EMBEDDING_DIMENSION: 384
+      DEFAULT_CHUNK_SIZE: 500
+      DEFAULT_CHUNK_OVERLAP: 100
+      EMBEDDINGS_FALLBACK: ${EMBEDDINGS_FALLBACK:-false}
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+    ports:
+      - "${AI_SERVICE_PORT:-8000}:8000"
+    depends_on:
+      truthguard-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - truthguard-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: truthguard-backend
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://truthguard-postgres:5432/${POSTGRES_DB:-truthguard}
+      DB_USER: ${POSTGRES_USER:-truthguard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-truthguard_dev_password}
+      AI_SERVICE_URL: http://ai-service:8000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
+      STORAGE_UPLOAD_DIR: ./storage/uploads
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      truthguard-db:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    networks:
+      - truthguard-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: truthguard-frontend
+    restart: unless-stopped
+    environment:
+      VITE_BACKEND_URL: http://localhost:8080
+      VITE_AI_SERVICE_URL: http://localhost:8000
+    ports:
+      - "${VITE_APP_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - truthguard-network
+
+networks:
+  truthguard-network:
+    driver: bridge
 
 volumes:
   pgvector_data:

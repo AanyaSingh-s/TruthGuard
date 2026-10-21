@@ -109,6 +109,42 @@ public class TextExtractionClient {
         }
     }
 
+    public void indexVersion(
+            java.util.UUID documentId,
+            java.util.UUID versionId,
+            String text,
+            String sourceTitle,
+            String versionIdentifier,
+            java.time.LocalDate effectiveDate,
+            com.truthguard.model.AuthorityLevel authorityLevel,
+            com.truthguard.model.SourceType sourceType,
+            java.util.UUID supersedesVersionId
+    ) {
+        log.info("Requesting Python AI Service to chunk and index version {}", versionId);
+        try {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("document_id", documentId.toString());
+            payload.put("version_id", versionId.toString());
+            payload.put("text", text);
+            if (sourceTitle != null) payload.put("source_title", sourceTitle);
+            if (versionIdentifier != null) payload.put("version_identifier", versionIdentifier);
+            if (effectiveDate != null) payload.put("effective_date", effectiveDate.toString());
+            if (authorityLevel != null) payload.put("authority_level", authorityLevel.name());
+            if (sourceType != null) payload.put("source_type", sourceType.name());
+            if (supersedesVersionId != null) payload.put("supersedes_version_id", supersedesVersionId.toString());
+
+            restClient.post()
+                    .uri("/api/v1/index-version")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(payload)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Successfully indexed version {} in AI vector store", versionId);
+        } catch (Exception e) {
+            log.warn("Automatic indexing in AI service failed or skipped for version {}: {}", versionId, e.getMessage());
+        }
+    }
+
     private String parseErrorMessage(String errorBody) {
         try {
             JsonNode node = objectMapper.readTree(errorBody);
@@ -116,6 +152,12 @@ public class TextExtractionClient {
                 JsonNode detail = node.get("detail");
                 if (detail.isObject() && detail.has("message")) {
                     return detail.get("message").asText();
+                } else if (detail.isArray() && !detail.isEmpty()) {
+                    JsonNode first = detail.get(0);
+                    if (first.has("msg")) {
+                        return first.get("msg").asText();
+                    }
+                    return detail.toString();
                 }
                 return detail.asText();
             }

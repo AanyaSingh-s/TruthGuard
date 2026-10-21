@@ -6,20 +6,31 @@ import com.truthguard.dto.RegisterVersionRequest;
 import com.truthguard.dto.SupersedeVersionRequest;
 import com.truthguard.model.AuthorityLevel;
 import com.truthguard.model.SourceType;
+import com.truthguard.exception.DocumentParsingException;
+import com.truthguard.service.TextExtractionClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -34,6 +45,9 @@ class DocumentControllerIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockBean
+    private TextExtractionClient extractionClient;
 
     @Test
     @DisplayName("POST /api/v1/documents should create document and return HTTP 201")
@@ -252,6 +266,148 @@ class DocumentControllerIntegrationTest {
                 .andExpect(jsonPath("$.isSuperseded").value(true))
                 .andExpect(jsonPath("$.supersededById").value(v2Id.toString()))
                 .andExpect(jsonPath("$.supersededByVersionIdentifier").value("v2.0"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/documents/{id}/versions/upload should ingest supported TXT and link extracted text")
+    void shouldUploadSupportedFileSuccessfullyViaMultipart() throws Exception {
+        UUID docId = createTestDocument("Network Security Architecture");
+        String sampleText = "All egress traffic must traverse the authenticated web proxy.";
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "security_policy.txt", "text/plain", sampleText.getBytes()
+        );
+
+        when(extractionClient.extractText(anyString(), any())).thenReturn(
+                new TextExtractionClient.ExtractionResult("TXT", sampleText, sampleText.length(), 8, "sha256-mock-hash-111")
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/v1/documents/" + docId + "/versions/upload")
+                        .file(file)
+                        .param("versionIdentifier", "v1.0")
+                        .param("effectiveDate", "2024-03-01")
+                        .param("authorityLevel", "OFFICIAL"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.documentId").value(docId.toString()))
+                .andExpect(jsonPath("$.versionIdentifier").value("v1.0"))
+                .andExpect(jsonPath("$.processingStatus").value("PROCESSED"))
+                .andExpect(jsonPath("$.rawContent").value(sampleText))
+                .andExpect(jsonPath("$.contentHash").value("sha256-mock-hash-111"))
+                .andExpect(jsonPath("$.authorityLevel").value("OFFICIAL"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/documents/{id}/versions/upload with empty (0-byte) file should return HTTP 400 Bad Request")
+    void shouldRejectUploadOfEmptyFile() throws Exception {
+        UUID docId = createTestDocument("Empty Policy Test");
+        MockMultipartFile emptyFile = new MockMultipartFile(
+                "file", "empty.txt", "text/plain", new byte[0]
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/v1/documents/" + docId + "/versions/upload")
+                        .file(emptyFile)
+                        .param("versionIdentifier", "v1.0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("EmptyFile"))
+                .andExpect(jsonPath("$.message").value(containsString("empty")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/documents/{id}/versions/upload with unsupported file extension should return HTTP 415")
+    void shouldRejectUploadOfUnsupportedExtension() throws Exception {
+        UUID docId = createTestDocument("Unsupported Extension Test");
+        MockMultipartFile exeFile = new MockMultipartFile(
+                "file", "malware.exe", "application/octet-stream", "MZbinary".getBytes()
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/v1/documents/" + docId + "/versions/upload")
+                        .file(exeFile)
+                        .param("versionIdentifier", "v1.0"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.error").value("UnsupportedFormat"))
+                .andExpect(jsonPath("$.message").value(containsString("Unsupported file format '.exe'")));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/documents/{id}/versions/upload when extraction fails records status as FAILED and returns HTTP 422")
+    void shouldHandleExtractionFailureAndRecordStatusFailed() throws Exception {
+        UUID docId = createTestDocument("Malformed Document Test");
+        MockMultipartFile corruptFile = new MockMultipartFile(
+                "file", "corrupt.pdf", "application/pdf", "%PDF-bad-corrupted".getBytes()
+        );
+
+        when(extractionClient.extractText(anyString(), any()))
+                .thenThrow(new DocumentParsingException("Malformed or corrupt PDF document: stream unreadable"));
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/v1/documents/" + docId + "/versions/upload")
+                        .file(corruptFile)
+                        .param("versionIdentifier", "v1.0"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("DocumentParsingError"))
+                .andExpect(jsonPath("$.message").value(containsString("Malformed or corrupt PDF")));
+
+        // Verify version was saved with status FAILED and never marked PROCESSED
+        mockMvc.perform(get("/api/v1/documents/" + docId + "/versions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].versionIdentifier").value("v1.0"))
+                .andExpect(jsonPath("$[0].processingStatus").value("FAILED"))
+                .andExpect(jsonPath("$[0].rawContent").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Upload synthetic sample TXT and PDF files and verify content linking")
+    void shouldUploadSyntheticSampleTxtAndPdfFiles() throws Exception {
+        UUID docId = createTestDocument("Synthetic Corpora Standard");
+
+        // 1. Upload synthetic TXT
+        byte[] txtBytes;
+        try (var is = getClass().getClassLoader().getResourceAsStream("sample_documents/sample_policy_v1.txt")) {
+            txtBytes = is.readAllBytes();
+        }
+        MockMultipartFile txtFile = new MockMultipartFile(
+                "file", "sample_policy_v1.txt", "text/plain", txtBytes
+        );
+
+        when(extractionClient.extractText(eq("sample_policy_v1.txt"), any())).thenReturn(
+                new TextExtractionClient.ExtractionResult(
+                        "TXT", new String(txtBytes), txtBytes.length, 45, "synthetic-txt-hash-v1"
+                )
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/v1/documents/" + docId + "/versions/upload")
+                        .file(txtFile)
+                        .param("versionIdentifier", "v1.0")
+                        .param("effectiveDate", "2024-01-15")
+                        .param("authorityLevel", "OFFICIAL"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.versionIdentifier").value("v1.0"))
+                .andExpect(jsonPath("$.processingStatus").value("PROCESSED"))
+                .andExpect(jsonPath("$.rawContent").value(containsString("TruthGuard Enterprise Security Standard")));
+
+        // 2. Upload synthetic PDF
+        byte[] pdfBytes;
+        try (var is = getClass().getClassLoader().getResourceAsStream("sample_documents/sample_regulation.pdf")) {
+            pdfBytes = is.readAllBytes();
+        }
+        MockMultipartFile pdfFile = new MockMultipartFile(
+                "file", "sample_regulation.pdf", "application/pdf", pdfBytes
+        );
+
+        when(extractionClient.extractText(eq("sample_regulation.pdf"), any())).thenReturn(
+                new TextExtractionClient.ExtractionResult(
+                        "PDF", "TruthGuard Regulatory Compliance Guideline", 42, 4, "synthetic-pdf-hash-v2"
+                )
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/v1/documents/" + docId + "/versions/upload")
+                        .file(pdfFile)
+                        .param("versionIdentifier", "v2.0")
+                        .param("effectiveDate", "2024-06-01")
+                        .param("authorityLevel", "REGULATORY"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.versionIdentifier").value("v2.0"))
+                .andExpect(jsonPath("$.processingStatus").value("PROCESSED"))
+                .andExpect(jsonPath("$.rawContent").value(containsString("Regulatory Compliance Guideline")));
     }
 
     private UUID createTestDocument(String title) throws Exception {

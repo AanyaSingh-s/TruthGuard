@@ -1,0 +1,9 @@
+TruthGuard Enterprise Security Standard
+Version: 2.0
+Effective Date: 2024-07-01
+Authority: EXECUTIVE
+Supersedes: Version 1.0
+
+1. Access Control: All production systems require hardware security key MFA (FIDO2).
+2. Data Retention: Customer audit logs must be retained for 730 days (2 years).
+3. Network Policy: Direct SSH on port 22 is deprecated. All terminal access must use zero-trust identity proxy.

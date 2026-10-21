@@ -1,0 +1,9 @@
+TruthGuard Production Operations Runbook
+Title: Production Operations Runbook
+Version: 1.0
+Effective Date: 2026-01-01
+Authority: OFFICIAL
+Source Type: POLICY
+
+1. Engineer Workstations: Production session idle timeout is set to exactly 60 minutes for all engineer terminals to prevent premature disconnections during system maintenance tasks.
+2. Maintenance Access: On-call engineers may maintain active command-line sessions without re-authenticating for up to one full hour.

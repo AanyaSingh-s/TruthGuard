@@ -26,6 +26,34 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
+    @ExceptionHandler(QueryNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleQueryNotFound(QueryNotFoundException ex, HttpServletRequest request) {
+        log.warn("Query not found: {}", ex.getMessage());
+        ErrorResponse error = ErrorResponse.of(HttpStatus.NOT_FOUND.value(), "NotFound", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(AiServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleAiServiceUnavailable(AiServiceUnavailableException ex, HttpServletRequest request) {
+        log.error("AI Service unavailable: {}", ex.getMessage());
+        ErrorResponse error = ErrorResponse.of(HttpStatus.SERVICE_UNAVAILABLE.value(), "AiServiceUnavailable", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
+    }
+
+    @ExceptionHandler(AiServiceTimeoutException.class)
+    public ResponseEntity<ErrorResponse> handleAiServiceTimeout(AiServiceTimeoutException ex, HttpServletRequest request) {
+        log.error("AI Service timeout: {}", ex.getMessage());
+        ErrorResponse error = ErrorResponse.of(HttpStatus.GATEWAY_TIMEOUT.value(), "AiServiceTimeout", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(error);
+    }
+
+    @ExceptionHandler(AiServiceException.class)
+    public ResponseEntity<ErrorResponse> handleAiServiceException(AiServiceException ex, HttpServletRequest request) {
+        log.error("AI Service failure: {}", ex.getMessage());
+        ErrorResponse error = ErrorResponse.of(HttpStatus.BAD_GATEWAY.value(), "AiServiceError", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);
+    }
+
     @ExceptionHandler(DocumentVersionNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleVersionNotFound(DocumentVersionNotFoundException ex, HttpServletRequest request) {
         log.warn("Document version not found: {}", ex.getMessage());
@@ -93,6 +121,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
         log.warn("Illegal argument: {}", ex.getMessage());
         ErrorResponse error = ErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "BadRequest", ex.getMessage(), request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        log.warn("Parameter type mismatch: {} = {}", ex.getName(), ex.getValue());
+        String msg = String.format("Invalid value '%s' for parameter '%s'", ex.getValue(), ex.getName());
+        ErrorResponse error = ErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "InvalidParameter", msg, request.getRequestURI());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 

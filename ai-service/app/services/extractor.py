@@ -40,6 +40,8 @@ def extract_from_txt(file_bytes: bytes) -> Tuple[str, Dict[str, Any]]:
     for encoding in ("utf-8", "utf-8-sig", "latin-1", "cp1252"):
         try:
             text = file_bytes.decode(encoding)
+            if "\x00" in text:
+                raise MalformedDocumentError("Text file contains null bytes or binary content")
             clean_text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
             if not clean_text:
                 raise EmptyDocumentError("The plain text document contains no readable text")
@@ -52,6 +54,9 @@ def extract_from_txt(file_bytes: bytes) -> Tuple[str, Dict[str, Any]]:
 def extract_from_pdf(file_bytes: bytes) -> Tuple[str, Dict[str, Any]]:
     """Extract and normalize text from PDF document."""
     try:
+        if not file_bytes.startswith(b"%PDF"):
+            raise MalformedDocumentError("File does not start with valid PDF header (%PDF)")
+
         stream = io.BytesIO(file_bytes)
         reader = pypdf.PdfReader(stream)
         num_pages = len(reader.pages)

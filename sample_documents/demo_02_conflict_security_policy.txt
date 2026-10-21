@@ -1,0 +1,9 @@
+TruthGuard Access Control Security Policy
+Title: Access Control Security Policy
+Version: 1.0
+Effective Date: 2026-01-01
+Authority: OFFICIAL
+Source Type: POLICY
+
+1. Terminal Timeout: Production session idle timeout must be strictly enforced at 15 minutes for all engineer terminals without exception.
+2. Re-authentication: Idle terminal connections exceeding 15 minutes must be severed by bastion proxies to protect sensitive infrastructure.

@@ -1,0 +1,9 @@
+TruthGuard Compliance and Data Retention Standard
+Title: Compliance and Data Retention Standard
+Version: 1.0
+Effective Date: 2024-01-15
+Authority: OFFICIAL
+Source Type: POLICY
+
+1. Customer Audit Logs: Customer audit logs must be retained for exactly 365 days (1 year) from generation date before purging.
+2. Backup Archive: Snapshots are preserved in cool storage for the duration of the 365-day retention window.

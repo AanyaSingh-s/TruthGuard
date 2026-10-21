@@ -1,0 +1,10 @@
+TruthGuard Compliance and Data Retention Standard
+Title: Compliance and Data Retention Standard
+Version: 2.0
+Effective Date: 2025-06-01
+Authority: EXECUTIVE
+Supersedes: Version 1.0
+Source Type: POLICY
+
+1. Customer Audit Logs: Customer audit logs must be retained for 730 days (2 full years) to satisfy expanded SOC2 and ISO27001 compliance standards.
+2. Supersession Notice: This policy formally revokes and supersedes the older Version 1.0 365-day retention requirement.

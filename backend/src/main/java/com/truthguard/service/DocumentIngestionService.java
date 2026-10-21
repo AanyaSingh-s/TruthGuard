@@ -40,7 +40,7 @@ public class DocumentIngestionService {
         this.extractionClient = extractionClient;
     }
 
-    @Transactional(noRollbackFor = {DocumentParsingException.class, DuplicateContentException.class})
+    @Transactional(noRollbackFor = Exception.class)
     public DocumentVersionResponse ingestFile(
             UUID documentId,
             MultipartFile file,
@@ -121,12 +121,19 @@ public class DocumentIngestionService {
 
         // 7. Handle explicit supersession if provided
         if (supersedesVersionId != null) {
-            DocumentVersion olderVersion = versionRepository.findByIdAndDocumentId(supersedesVersionId, documentId)
-                    .orElseThrow(() -> new InvalidSupersessionException(
-                            "Cannot supersede version " + supersedesVersionId + " because it does not exist for document " + documentId
-                    ));
+            java.util.Optional<DocumentVersion> olderVersionOpt = versionRepository.findByIdAndDocumentId(supersedesVersionId, documentId);
+            if (olderVersionOpt.isEmpty()) {
+                version.setProcessingStatus(ProcessingStatus.FAILED);
+                versionRepository.save(version);
+                throw new InvalidSupersessionException(
+                    "Cannot supersede version " + supersedesVersionId + " because it does not exist for document " + documentId
+                );
+            }
 
+            DocumentVersion olderVersion = olderVersionOpt.get();
             if (olderVersion.getId().equals(version.getId())) {
+                version.setProcessingStatus(ProcessingStatus.FAILED);
+                versionRepository.save(version);
                 throw new InvalidSupersessionException("A version cannot supersede itself");
             }
 
@@ -144,6 +151,26 @@ public class DocumentIngestionService {
 
         document.setUpdatedAt(finalizedVersion.getUploadTimestamp());
         documentRepository.save(document);
+
+        // 9. Dispatch to AI service for chunking and vector indexing
+        try {
+            UUID supersedesId = finalizedVersion.getSupersedesVersion() != null
+                    ? finalizedVersion.getSupersedesVersion().getId() : null;
+            extractionClient.indexVersion(
+                    document.getId(),
+                    finalizedVersion.getId(),
+                    finalizedVersion.getRawContent(),
+                    document.getTitle(),
+                    finalizedVersion.getVersionIdentifier(),
+                    finalizedVersion.getEffectiveDate(),
+                    finalizedVersion.getAuthorityLevel(),
+                    document.getSourceType(),
+                    supersedesId
+            );
+        } catch (Exception e) {
+            log.warn("Automatic indexing in AI service failed or skipped for version {}: {}",
+                    finalizedVersion.getId(), e.getMessage());
+        }
 
         log.info("Successfully ingested version {} ({}) for document {}",
                 finalizedVersion.getId(), finalizedVersion.getVersionIdentifier(), documentId);

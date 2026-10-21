@@ -15,7 +15,7 @@ def test_health_endpoint_returns_200():
     data = response.json()
     assert data["status"] == "UP"
     assert data["service"] == "truthguard-ai-service"
-    assert data["version"] == "0.1.0"
+    assert data["version"] == "0.2.0"
     assert "environment" in data
     assert "timestamp" in data
     assert "details" in data
@@ -35,4 +35,4 @@ def test_cors_headers():
     """Verify CORS headers allow cross-origin requests from frontend."""
     response = client.get("/health", headers={"Origin": "http://localhost:5173"})
     assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == "*"
+    assert response.headers.get("access-control-allow-origin") in ["*", "http://localhost:5173"]

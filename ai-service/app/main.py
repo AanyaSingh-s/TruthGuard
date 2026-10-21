@@ -9,6 +9,11 @@ from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
 from app.api.extraction import router as extraction_router
+from app.api.indexing import router as indexing_router
+from app.api.retrieval import router as retrieval_router
+from app.api.synthesis import router as synthesis_router
+from app.api.critic import router as critic_router
+from app.api.pipeline import router as pipeline_router
 from app.config import settings
 
 # Configure structured logging
@@ -37,12 +42,12 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Enable CORS for frontend and orchestrator backend
+# Enable CORS narrowly for frontend and orchestrator backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -63,6 +68,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(health_router)
 app.include_router(extraction_router)
+app.include_router(indexing_router)
+app.include_router(retrieval_router)
+app.include_router(synthesis_router)
+app.include_router(critic_router)
+app.include_router(pipeline_router)
 
 
 if __name__ == "__main__":

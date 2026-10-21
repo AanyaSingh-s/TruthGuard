@@ -1,0 +1,9 @@
+TruthGuard Engineering Baseline Standard
+Title: Engineering Baseline Standard
+Version: 1.0
+Effective Date: 2026-01-01
+Authority: OFFICIAL
+Source Type: SPECIFICATION
+
+1. Encryption at Rest: All production databases must enforce AES-256-GCM encryption for persistent volumes.
+2. Transport Security: All production database client connections must enforce TLS 1.3 encryption with certificate validation. Unencrypted database traffic is blocked by firewall rules.

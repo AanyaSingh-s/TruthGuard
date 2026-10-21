@@ -73,4 +73,52 @@ class StorageServiceTest {
         assertThatThrownBy(() -> storageService.store(docId, noExtFile))
                 .isInstanceOf(UnsupportedFileFormatException.class);
     }
+
+    @Test
+    @DisplayName("Should reject spoofed PDF with invalid magic bytes")
+    void shouldRejectSpoofedPdf() {
+        UUID docId = UUID.randomUUID();
+        MockMultipartFile spoofedPdf = new MockMultipartFile("file", "fake.pdf", "application/pdf", "NOT A REAL PDF".getBytes());
+
+        assertThatThrownBy(() -> storageService.store(docId, spoofedPdf))
+                .isInstanceOf(UnsupportedFileFormatException.class)
+                .hasMessageContaining("magic bytes mismatch");
+    }
+
+    @Test
+    @DisplayName("Should accept valid PDF with correct magic bytes")
+    void shouldAcceptValidPdf() {
+        UUID docId = UUID.randomUUID();
+        MockMultipartFile validPdf = new MockMultipartFile("file", "valid.pdf", "application/pdf", "%PDF-1.4 sample content".getBytes());
+
+        StorageService.StoredFile stored = storageService.store(docId, validPdf);
+        assertThat(stored.extension()).isEqualTo("pdf");
+    }
+
+    @Test
+    @DisplayName("Should reject spoofed DOCX with invalid magic bytes")
+    void shouldRejectSpoofedDocx() {
+        UUID docId = UUID.randomUUID();
+        MockMultipartFile spoofedDocx = new MockMultipartFile("file", "fake.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "NOT A REAL DOCX".getBytes());
+
+        assertThatThrownBy(() -> storageService.store(docId, spoofedDocx))
+                .isInstanceOf(UnsupportedFileFormatException.class)
+                .hasMessageContaining("magic bytes mismatch");
+    }
+
+    @Test
+    @DisplayName("Should reject file exceeding maximum permitted file size")
+    void shouldRejectFileExceedingMaxSize() {
+        StorageService restrictedService = new StorageService(tempStorageDir.toString(), 25L); // 25 bytes limit
+        UUID docId = UUID.randomUUID();
+        MockMultipartFile largeFile = new MockMultipartFile(
+                "file",
+                "large.txt",
+                "text/plain",
+                "This text content exceeds 25 bytes limit definitely.".getBytes()
+        );
+
+        assertThatThrownBy(() -> restrictedService.store(docId, largeFile))
+                .isInstanceOf(org.springframework.web.multipart.MaxUploadSizeExceededException.class);
+    }
 }

@@ -1,0 +1,9 @@
+TruthGuard Security Architecture Guideline
+Title: Security Architecture Guideline
+Version: 1.0
+Effective Date: 2026-01-01
+Authority: OFFICIAL
+Source Type: POLICY
+
+1. Database Security: All database network communication across production microservices must use TLS 1.3. Plaintext connections will be terminated immediately.
+2. Volume Protection: Production data disks must utilize AES-256-GCM hardware-backed storage encryption.
