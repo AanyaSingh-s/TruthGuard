@@ -1,0 +1,18 @@
+package com.truthguard;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class TruthGuardApplication {
+
+    private static final Logger log = LoggerFactory.getLogger(TruthGuardApplication.class);
+
+    public static void main(String[] args) {
+        log.info("Starting TruthGuard Backend Application...");
+        SpringApplication.run(TruthGuardApplication.class, args);
+        log.info("TruthGuard Backend Application started successfully.");
+    }
+}

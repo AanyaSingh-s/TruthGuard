@@ -1,0 +1,48 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+*.crt
+secrets/
+
+# Operating System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~
+*.iml
+.project
+.classpath
+.settings/
+
+# Build artifacts & dependencies (catch-all)
+target/
+dist/
+build/
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+*.class
+*.log
+logs/
+
+# Database local data files
+data/
+pgvector_data/
+*.db
+*.sqlite3
